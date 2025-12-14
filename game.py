@@ -86,9 +86,9 @@ PAUSE_IMG = try_load(os.path.join(GRAPHIC_DIR,"pause.png"),(int(SCREEN_W*0.35),i
 CONTINUE_IMG = try_load(os.path.join(GRAPHIC_DIR,"continue.png"),(int(SCREEN_W*0.35),int(SCREEN_H*0.15)))
 
 WIN_BG = try_load(os.path.join(GRAPHIC_DIR,"winbg.png"),(SCREEN_W,SCREEN_H))
-NEXTLEVEL_IMG = try_load(os.path.join(GRAPHIC_DIR,"nextlevel.png"),(int(SCREEN_W*0.16),int(SCREEN_H*0.1)))
+NEXTLEVEL_IMG = try_load(os.path.join(GRAPHIC_DIR,"nextlevel.png"),(int(SCREEN_W*0.78),int(SCREEN_H*0.31)))
 LOSE_BG = try_load(os.path.join(GRAPHIC_DIR,"losebg.png"),(SCREEN_W,SCREEN_H))
-TRYAGAIN_IMG = try_load(os.path.join(GRAPHIC_DIR,"tryagain.png"),(int(SCREEN_W*0.16),int(SCREEN_H*0.1)))
+TRYAGAIN_IMG = try_load(os.path.join(GRAPHIC_DIR,"tryagain.png"),(int(SCREEN_W*0.75),int(SCREEN_H*0.28)))
 
 CARD_FILES = ["apple.png","banana.png","cat.png","dog.png","lion.png","tiger.png","wolf.png","zebra.png",
               "cherry.png","grape.png","orange1.png","orange2.png","peach.png","pear.png","watermelon.png","strawberry.png"]
@@ -131,9 +131,9 @@ class MatchGame:
             center=False
         )
 
-        self.nextlevel_btn = ImageButton(NEXTLEVEL_IMG,(SCREEN_W//2,int(SCREEN_H*0.66)))
+        self.nextlevel_btn = ImageButton(NEXTLEVEL_IMG,(SCREEN_W//2,int(SCREEN_H*0.6)))
         self.quit_btn_win = ImageButton(QUIT_BTN_MENU_IMG,(SCREEN_W//2,int(SCREEN_H*0.78)))
-        self.tryagain_btn = ImageButton(TRYAGAIN_IMG,(SCREEN_W//2,int(SCREEN_H*0.66)))
+        self.tryagain_btn = ImageButton(TRYAGAIN_IMG,(SCREEN_W//2,int(SCREEN_H*0.6)))
         self.quit_btn_lose = ImageButton(QUIT_BTN_MENU_IMG,(SCREEN_W//2,int(SCREEN_H*0.78)))
 
     # ---------- Setup level ----------
@@ -291,14 +291,10 @@ class MatchGame:
 
     def draw_win(self):
         SCREEN.blit(WIN_BG,(0,0))
-        msg=FONT.render("You Win!",True,WHITE)
-        SCREEN.blit(msg,msg.get_rect(center=(SCREEN_W//2,int(SCREEN_H*0.44))))
         self.nextlevel_btn.draw(SCREEN); self.quit_btn_win.draw(SCREEN)
 
     def draw_lose(self):
         SCREEN.blit(LOSE_BG,(0,0))
-        msg=FONT.render("You Lose!",True,WHITE)
-        SCREEN.blit(msg,msg.get_rect(center=(SCREEN_W//2,int(SCREEN_H*0.44))))
         self.tryagain_btn.draw(SCREEN); self.quit_btn_lose.draw(SCREEN)
 
     # ---------- Main loop ----------
