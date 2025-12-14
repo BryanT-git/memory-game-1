@@ -2,6 +2,11 @@ import os, sys, random, pygame
 
 # --------------- Config chung -----------------
 pygame.init()
+icon = pygame.image.load("logo.png")  # Đường dẫn tới file ảnh
+pygame.display.set_icon(icon)
+pygame.display.set_caption("Memory Game")
+
+
 pygame.mixer.init()
 
 SCREEN_W, SCREEN_H = 1280, 720
