@@ -2,7 +2,7 @@ import os, sys, random, pygame
 
 # --------------- Config chung -----------------
 pygame.init()
-pygame.mixer.quit()
+pygame.mixer.init()
 
 SCREEN_W, SCREEN_H = 1280, 720
 SCREEN = pygame.display.set_mode((SCREEN_W, SCREEN_H))
@@ -18,7 +18,21 @@ SMALL_FONT = pygame.font.SysFont("arial", 28)
 ASSET_DIR = "assets"
 GRAPHIC_DIR = os.path.join(ASSET_DIR, "graphic")
 CARD_DIR = os.path.join(ASSET_DIR, "card")
+SOUND_DIR = os.path.join(ASSET_DIR, "sound")
 
+# --------------- Âm thanh -----------------
+pygame.mixer.music.load(os.path.join(SOUND_DIR, "musicbg.mp3"))
+pygame.mixer.music.set_volume(0.2)   # giảm xuống 40%
+
+SFX_BUTTON = pygame.mixer.Sound(os.path.join(SOUND_DIR, "button_click_sfx.mp3"))
+SFX_FLIP   = pygame.mixer.Sound(os.path.join(SOUND_DIR, "card_flip_sfx.mp3"))
+SFX_WIN    = pygame.mixer.Sound(os.path.join(SOUND_DIR, "winsfx.mp3"))
+SFX_LOSE   = pygame.mixer.Sound(os.path.join(SOUND_DIR, "losesfx.mp3"))
+
+for sfx in (SFX_BUTTON, SFX_FLIP, SFX_WIN, SFX_LOSE):
+    sfx.set_volume(0.1)
+
+# --------------- Hàm load ảnh -----------------
 def load_image(path, scale=None):
     img = pygame.image.load(path).convert_alpha()
     if scale:
@@ -37,6 +51,7 @@ def try_load(path, fallback_size=None, text=""):
             surf.blit(t, rect)
         return surf
 
+# --------------- Class UI -----------------
 class ImageButton:
     def __init__(self, image, pos, center=True):
         self.image = image
@@ -107,29 +122,24 @@ def centered_positions(cols, rows, card_w, card_h, padding=16, top_offset=120):
     return [pygame.Rect(start_x+c*(card_w+padding), start_y+r*(card_h+padding), card_w, card_h)
             for r in range(rows) for c in range(cols)]
 
+# --------------- Class Game -----------------
 class MatchGame:
     def __init__(self):
         self.state = STATE_MENU
         self.level = 1
         self.cards = []
         self.first_pick = None
-
         self.moves_left = 0
         self.time_left = 0
         self.start_ticks = 0
-
-        # Pause handling
         self.pause_overlay = False
-        self._paused_at = None  # timestamp when pause starts
-
-        # Prevent clicks while we’re waiting to flip cards back
+        self._paused_at = None
         self.pending_hide = None
         self._block_clicks_until = 0
 
         self.play_btn = ImageButton(PLAY_BTN_IMG, (SCREEN_W // 2, int(SCREEN_H * 0.65)))
         self.quit_btn_menu = ImageButton(QUIT_BTN_MENU_IMG, (SCREEN_W // 2, int(SCREEN_H * 0.8)))
 
-        # Level select buttons
         positions = [
             (int(SCREEN_W * 0.3), int(SCREEN_H * 0.52)),
             (int(SCREEN_W * 0.5), int(SCREEN_H * 0.52)),
@@ -166,7 +176,6 @@ class MatchGame:
         self.moves_left = config["moves"]
         self.time_left = config["time"]
 
-        # Reset timing and flags
         self.start_ticks = pygame.time.get_ticks()
         self.pause_overlay = False
         self._paused_at = None
@@ -174,7 +183,6 @@ class MatchGame:
         self.pending_hide = None
         self._block_clicks_until = 0
 
-        # Compute card size/layout
         hud_h = int(SCREEN_H * 0.12)
         avail_w = int(SCREEN_W * 0.86)
         avail_h = SCREEN_H - hud_h - int(SCREEN_H * 0.08)
@@ -182,17 +190,15 @@ class MatchGame:
 
         card_w = (avail_w - padding * (cols - 1)) // cols
         card_h = (avail_h - padding * (rows - 1)) // rows
-        size = max(24, min(card_w, card_h))  # clamp to a minimum size to avoid 0/negative
+        size = max(24, min(card_w, card_h))
         card_w = card_h = size
 
         rects = centered_positions(cols, rows, card_w, card_h, padding, top_offset=hud_h)
 
-        # Build image pool robustly for large grids
         pair_count = (cols * rows) // 2
         if pair_count <= len(CARD_FILES):
             choices = random.sample(CARD_FILES, pair_count)
         else:
-            # Cycle through assets to ensure enough distinct ids
             times = pair_count // len(CARD_FILES)
             remainder = pair_count % len(CARD_FILES)
             choices = CARD_FILES * times + random.sample(CARD_FILES, remainder)
@@ -200,7 +206,6 @@ class MatchGame:
         images = []
         for name in choices:
             img = load_card_image(name, (card_w, card_h))
-            # Guarantee a surface even if loading fails
             if img is None or not hasattr(img, "get_rect"):
                 img = try_load(os.path.join(CARD_DIR, name), (card_w, card_h), text=name)
             images.extend([(name, img), (name, img)])
@@ -209,7 +214,6 @@ class MatchGame:
         self.cards = [Card(img, rect, id_=name) for rect, (name, img) in zip(rects, images)]
 
     def update_timer(self):
-        # If paused, freeze time
         if self.pause_overlay and self._paused_at is not None:
             elapsed = (self._paused_at - self.start_ticks) // 1000
         else:
@@ -221,14 +225,12 @@ class MatchGame:
         return all(c.matched for c in self.cards)
 
     def handle_card_flip(self, pos):
-        if self.pause_overlay:
-            return
-        # Block clicks while waiting to flip back
-        if pygame.time.get_ticks() < self._block_clicks_until:
-            return
+        if self.pause_overlay: return
+        if pygame.time.get_ticks() < self._block_clicks_until: return
 
         for card in self.cards:
             if card.click(pos) and not card.flipped:
+                SFX_FLIP.play()
                 card.flipped = True
                 if self.first_pick is None:
                     self.first_pick = card
@@ -240,7 +242,6 @@ class MatchGame:
                         self.first_pick.matched = True
                         self.first_pick = None
                     else:
-                        # Schedule flip back and block further clicks briefly
                         pygame.time.set_timer(pygame.USEREVENT + 1, 600, loops=1)
                         self.pending_hide = (self.first_pick, second)
                         self._block_clicks_until = pygame.time.get_ticks() + 600
@@ -251,31 +252,41 @@ class MatchGame:
     def handle_events(self, events):
         for event in events:
             if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                pygame.quit(); sys.exit()
 
             if self.state == STATE_MENU:
+                if not pygame.mixer.music.get_busy():
+                    pygame.mixer.music.play(-1)
                 if self.play_btn.handle_event(event):
+                    SFX_BUTTON.play()
                     self.state = STATE_LEVEL_SELECT
                 elif self.quit_btn_menu.handle_event(event):
-                    pygame.quit()
-                    sys.exit()
+                    SFX_BUTTON.play()
+                    pygame.quit(); sys.exit()
 
             elif self.state == STATE_LEVEL_SELECT:
+                if not pygame.mixer.music.get_busy():
+                    pygame.mixer.music.play(-1)
                 if self.quit_btn_level.handle_event(event):
+                    SFX_BUTTON.play()
                     self.state = STATE_MENU
                 for idx, btn in self.level_btns:
                     if btn.handle_event(event):
+                        SFX_BUTTON.play()
                         self.level = idx
                         self.setup_level(idx)
                         self.state = STATE_PLAYING
+                        pygame.mixer.music.stop()
 
             elif self.state == STATE_PLAYING:
+                pygame.mixer.music.stop()
                 if self.pause_btn.handle_event(event):
+                    SFX_BUTTON.play()
                     if not self.pause_overlay:
                         self.pause_overlay = True
                         self._paused_at = pygame.time.get_ticks()
                 elif self.quit_btn_ingame.handle_event(event):
+                    SFX_BUTTON.play()
                     self.state = STATE_LEVEL_SELECT
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -284,16 +295,15 @@ class MatchGame:
                 if event.type == pygame.USEREVENT + 1 and self.pending_hide:
                     a, b = self.pending_hide
                     if a and b:
-                        a.flipped = False
-                        b.flipped = False
+                        a.flipped = False; b.flipped = False
                     self.pending_hide = None
-                    # allow clicks again; _block_clicks_until already set
 
             elif self.state == STATE_WIN:
+                pygame.mixer.music.stop()
                 if self.nextlevel_btn.handle_event(event):
+                    SFX_BUTTON.play()
                     last_level = max(LEVELS.keys())
                     if self.level >= last_level:
-                        # At last level, return to Level Select
                         self.state = STATE_LEVEL_SELECT
                     else:
                         next_lv = self.level + 1
@@ -301,38 +311,45 @@ class MatchGame:
                         self.setup_level(next_lv)
                         self.state = STATE_PLAYING
                 elif self.quit_btn_win.handle_event(event):
+                    SFX_BUTTON.play()
                     self.state = STATE_MENU
 
             elif self.state == STATE_LOSE:
+                pygame.mixer.music.stop()
                 if self.tryagain_btn.handle_event(event):
+                    SFX_BUTTON.play()
                     self.setup_level(self.level)
                     self.state = STATE_PLAYING
                 elif self.quit_btn_lose.handle_event(event):
+                    SFX_BUTTON.play()
                     self.state = STATE_MENU
 
-            # Resume from pause
             if self.state == STATE_PLAYING and self.pause_overlay:
                 if self.continue_btn.handle_event(event):
+                    SFX_BUTTON.play()
                     if self._paused_at is not None:
                         paused_duration = pygame.time.get_ticks() - self._paused_at
-                        # Push start_ticks forward by pause duration
                         self.start_ticks += paused_duration
                     self._paused_at = None
                     self.pause_overlay = False
 
-        # Win/lose check only when actively playing and not paused
         if self.state == STATE_PLAYING and not self.pause_overlay:
             t_remain = self.update_timer()
             if t_remain <= 0 or self.moves_left <= 0:
-                self.state = STATE_WIN if self.all_matched() else STATE_LOSE
+                if self.all_matched():
+                    SFX_WIN.play()
+                    self.state = STATE_WIN
+                else:
+                    SFX_LOSE.play()
+                    self.state = STATE_LOSE
             elif self.all_matched():
+                SFX_WIN.play()
                 self.state = STATE_WIN
 
     # ---------- Drawing ----------
     def draw_hud(self, screen, level):
         bar = pygame.Surface((SCREEN_W, int(SCREEN_H * 0.12)), pygame.SRCALPHA)
-        bar.fill(HUD_BG)
-        screen.blit(bar, (0, 0))
+        bar.fill(HUD_BG); screen.blit(bar, (0, 0))
         t_remain = self.update_timer()
         level_text = SMALL_FONT.render(f"Level {level}", True, WHITE)
         time_text = SMALL_FONT.render(f"Time: {t_remain}s", True, WHITE)
@@ -397,6 +414,7 @@ class MatchGame:
             CLOCK.tick(FPS)
 
 # --------------- Main -----------------
-if __name__=="__main__":
+if __name__ == "__main__":
     pygame.mouse.set_visible(True)
-    game=MatchGame(); game.run()
+    game = MatchGame()
+    game.run()
